@@ -1,3 +1,31 @@
 body { font-family: system-ui, sans-serif; margin: 2rem; }
 table { border-collapse: collapse; }
 th, td { border: 1px solid #ccc; padding: 0.4rem 0.8rem; text-align: left; }
+
+.estado-vacio {
+  margin: 1.5rem 0;
+  padding: 1rem 1.25rem;
+  border-radius: 6px;
+}
+
+.estado-vacio h2 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  font-size: 1.15rem;
+}
+
+.estado-vacio p {
+  margin: 0;
+}
+
+.estado-vacio--sin-clientes {
+  background-color: #f8fafc;
+  border: 2px dashed #94a3b8;
+  border-left: 6px solid #64748b;
+}
+
+.estado-vacio--sin-coincidencias {
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-left: 6px solid #16a34a;
+}

@@ -54,10 +54,22 @@ function ClientesPage() {
       {cargando && <p>Cargando clientes...</p>}
       {!cargando && error !== null && <p role="alert">{error}</p>}
       {!cargando && error === null && clientes.length === 0 && (
-        <p role="status">Todavía no hay clientes registrados.</p>
+        <section
+          className="estado-vacio estado-vacio--sin-clientes"
+          role="status"
+        >
+          <h2>Sin clientes registrados</h2>
+          <p>Todavía no hay clientes registrados.</p>
+        </section>
       )}
       {!cargando && error === null && clientes.length > 0 && clientesFiltrados.length === 0 && (
-        <p role="status">Ningún cliente coincide con "{filtro}".</p>
+        <section
+          className="estado-vacio estado-vacio--sin-coincidencias"
+          role="status"
+        >
+          <h2>Sin coincidencias</h2>
+          <p>Ningún cliente coincide con "{filtro}".</p>
+        </section>
       )}
       {!cargando && error === null && clientesFiltrados.length > 0 && (
         <ClienteTable clientes={clientesFiltrados} />
