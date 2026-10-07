@@ -1,6 +1,7 @@
 package ar.capacitacion.clientes;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.stereotype.Repository;
 
@@ -17,5 +18,9 @@ public class ClienteRepository {
 
     public List<ClienteDTO> findAll() {
         return DATOS;
+    }
+
+    public Optional<ClienteDTO> findById(long id) {
+        return DATOS.stream().filter(c -> c.id() == id).findFirst();
     }
 }

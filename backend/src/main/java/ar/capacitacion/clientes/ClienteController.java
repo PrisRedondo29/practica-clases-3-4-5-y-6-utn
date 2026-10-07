@@ -6,6 +6,7 @@ import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -35,5 +36,23 @@ public class ClienteController {
             return ResponseEntity.ok(List.<ClienteDTO>of());
         }
         return ResponseEntity.ok(service.listar());
+    }
+
+    /**
+     * GET /api/clientes/{id}                  -> 200 con cliente o 404
+     * GET /api/clientes/{id}?scenario=error   -> 503
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<?> obtenerPorId(
+            @PathVariable long id,
+            @RequestParam(required = false) String scenario) {
+        if ("error".equals(scenario)) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of("mensaje", "Servicio no disponible (escenario didáctico)"));
+        }
+        return service.buscarPorId(id)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("mensaje", "Cliente no encontrado")));
     }
 }
