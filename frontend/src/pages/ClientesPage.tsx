@@ -53,7 +53,13 @@ function ClientesPage() {
       <ClienteFiltro valor={filtro} onCambio={handleCambioFiltro} />
       {cargando && <p>Cargando clientes...</p>}
       {!cargando && error !== null && <p role="alert">{error}</p>}
-      {!cargando && error === null && (
+      {!cargando && error === null && clientes.length === 0 && (
+        <p role="status">Todavía no hay clientes registrados.</p>
+      )}
+      {!cargando && error === null && clientes.length > 0 && clientesFiltrados.length === 0 && (
+        <p role="status">Ningún cliente coincide con "{filtro}".</p>
+      )}
+      {!cargando && error === null && clientesFiltrados.length > 0 && (
         <ClienteTable clientes={clientesFiltrados} />
       )}
     </div>

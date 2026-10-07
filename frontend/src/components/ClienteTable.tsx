@@ -6,9 +6,6 @@ type ClienteTableProps = {
 };
 
 export function ClienteTable({ clientes }: ClienteTableProps) {
-  if (clientes.length === 0) {
-    return <p>No hay clientes.</p>;
-  }
 
   return (
     <table>
