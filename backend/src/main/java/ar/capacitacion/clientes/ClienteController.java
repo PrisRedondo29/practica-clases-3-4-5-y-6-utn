@@ -39,7 +39,7 @@ public class ClienteController {
     }
 
     /**
-     * GET /api/clientes/{id}                  -> 200 con cliente o 404
+     * GET /api/clientes/{id}                  -> 200 con detalle de cliente o 404
      * GET /api/clientes/{id}?scenario=error   -> 503
      */
     @GetMapping("/{id}")

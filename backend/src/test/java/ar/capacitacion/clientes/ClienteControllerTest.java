@@ -24,7 +24,13 @@ class ClienteControllerTest {
     void listarClientes_deberiaRetornar5Elementos() throws Exception {
         mockMvc.perform(get("/api/clientes").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(5)));
+                .andExpect(jsonPath("$", hasSize(5)))
+                .andExpect(jsonPath("$[0].id", is(1)))
+                .andExpect(jsonPath("$[0].nombre", is("Ana")))
+                .andExpect(jsonPath("$[0].estado", is("ACTIVO")))
+                .andExpect(jsonPath("$[0].email").doesNotExist())
+                .andExpect(jsonPath("$[0].telefono").doesNotExist())
+                .andExpect(jsonPath("$[0].fechaAlta").doesNotExist());
     }
 
     @Test
@@ -47,7 +53,10 @@ class ClienteControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is(1)))
                 .andExpect(jsonPath("$.nombre", is("Ana")))
-                .andExpect(jsonPath("$.estado", is("ACTIVO")));
+                .andExpect(jsonPath("$.estado", is("ACTIVO")))
+                .andExpect(jsonPath("$.email", is("ana@example.com")))
+                .andExpect(jsonPath("$.telefono", is("11-4000-1001")))
+                .andExpect(jsonPath("$.fechaAlta", is("2022-03-15")));
     }
 
     @Test
@@ -56,7 +65,10 @@ class ClienteControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is(5)))
                 .andExpect(jsonPath("$.nombre", is("Elena")))
-                .andExpect(jsonPath("$.estado", is("INACTIVO")));
+                .andExpect(jsonPath("$.estado", is("INACTIVO")))
+                .andExpect(jsonPath("$.email", is("elena@example.com")))
+                .andExpect(jsonPath("$.telefono", is("11-4000-1005")))
+                .andExpect(jsonPath("$.fechaAlta", is("2024-05-30")));
     }
 
     @Test

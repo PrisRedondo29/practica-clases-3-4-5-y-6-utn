@@ -1,5 +1,5 @@
 package ar.capacitacion.clientes;
 
-/** Contrato JSON: { "id": 1, "nombre": "Ana", "estado": "ACTIVO" } */
+/** Contrato resumido para el listado de clientes. */
 public record ClienteDTO(long id, String nombre, EstadoCliente estado) {
 }

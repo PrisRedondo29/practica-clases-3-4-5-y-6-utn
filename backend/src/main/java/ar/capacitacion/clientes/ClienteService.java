@@ -18,7 +18,7 @@ public class ClienteService {
         return repository.findAll();
     }
 
-    public Optional<ClienteDTO> buscarPorId(long id) {
+    public Optional<ClienteDetalleDTO> buscarPorId(long id) {
         return repository.findById(id);
     }
 }
