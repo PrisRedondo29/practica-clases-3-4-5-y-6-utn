@@ -13,6 +13,7 @@ export function ClienteTable({ clientes }: ClienteTableProps) {
         <tr>
           <th>Nombre</th>
           <th>Estado</th>
+          <th>Acción</th>
         </tr>
       </thead>
 
