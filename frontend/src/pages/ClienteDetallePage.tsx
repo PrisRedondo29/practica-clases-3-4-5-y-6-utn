@@ -1,44 +1,24 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { getCliente } from "../api/clientesapi"; // ajustar a la ruta real
 import type { ClienteDetalleDTO } from "../types/ClienteDetalleDTO"; // ajustar a la ruta real
 
-type Estado =
-  | { tipo: "loading" }
-  | { tipo: "exito"; cliente: ClienteDetalleDTO }
-  | { tipo: "no-encontrado" }
-  | { tipo: "error" };
-
 export function ClienteDetallePage() {
   const { id } = useParams();
   const clienteId = parseClienteId(id);
-  const [estado, setEstado] = useState<Estado>({ tipo: "loading" });
 
-  useEffect(() => {
-    if (clienteId === null) {
-      return;
-    }
-
-    let cancelado = false;
-    setEstado({ tipo: "loading" });
-
-    getCliente(clienteId)
-      .then((cliente) => {
-        if (cancelado) return;
-        setEstado(
-          cliente === null
-            ? { tipo: "no-encontrado" }
-            : { tipo: "exito", cliente },
-        );
-      })
-      .catch(() => {
-        if (!cancelado) setEstado({ tipo: "error" });
-      });
-
-    return () => {
-      cancelado = true;
-    };
-  }, [clienteId]);
+  const { data, isPending, isError, isSuccess } =
+    useQuery<ClienteDetalleDTO | null>({
+      queryKey: ["cliente", clienteId],
+      queryFn: () => {
+        if (clienteId === null) {
+          throw new Error("El id del cliente no es válido.");
+        }
+        return getCliente(clienteId);
+      },
+      enabled: clienteId !== null,
+      staleTime: 60_000, // 1 minuto
+    });
 
   return (
     <main>
@@ -48,14 +28,12 @@ export function ClienteDetallePage() {
         <p>El id del cliente no es válido.</p>
       ) : (
         <>
-          {estado.tipo === "loading" && <p>Cargando cliente...</p>}
-          {estado.tipo === "no-encontrado" && <p>Cliente no encontrado.</p>}
-          {estado.tipo === "error" && (
-            <p>No se pudo cargar el cliente. Intentá nuevamente.</p>
-          )}
-          {estado.tipo === "exito" && (
+          {isPending && <p>Cargando cliente...</p>}
+          {isError && <p>No se pudo cargar el cliente. Intentá nuevamente.</p>}
+          {isSuccess && data === null && <p>Cliente no encontrado.</p>}
+          {isSuccess && data !== null && (
             <dl>
-              {Object.entries(estado.cliente).map(([campo, valor]) => (
+              {Object.entries(data).map(([campo, valor]) => (
                 <div key={campo}>
                   <dt>{campo}</dt>
                   <dd>{formatearValor(valor)}</dd>
@@ -66,7 +44,7 @@ export function ClienteDetallePage() {
         </>
       )}
 
-      <Link to="/clientes">Volver a clientes</Link>
+      <Link to="/clientes">Volver a la lista de clientes</Link>
     </main>
   );
 }
