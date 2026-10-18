@@ -1,11 +1,16 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
-import { getCliente } from "../api/clientesapi"; // ajustar a la ruta real
+import { getCliente, updateCliente } from "../api/clientesapi"; // ajustar a la ruta real
 import type { ClienteDetalleDTO } from "../types/ClienteDetalleDTO"; // ajustar a la ruta real
+import { ClienteForm } from "../components/ClienteForm";
+import { ClienteUpdateRequest } from "../types/ClienteUpdateRequest";
 
 export function ClienteDetallePage() {
   const { id } = useParams();
   const clienteId = parseClienteId(id);
+  const [editando, setEditando] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data, isPending, isError, isSuccess } =
     useQuery<ClienteDetalleDTO | null>({
@@ -19,6 +24,23 @@ export function ClienteDetallePage() {
       enabled: clienteId !== null,
       staleTime: 60_000, // 1 minuto
     });
+  
+  const actualizar = useMutation({
+    mutationFn: (datos: ClienteUpdateRequest) => {
+      if (clienteId === null) {
+        return Promise.reject(new Error('ID de cliente inválido'));
+      }
+      return updateCliente(clienteId, datos);
+    },
+    onSuccess: async () => {
+      if (clienteId !== null) {
+        await queryClient.invalidateQueries({ queryKey: ['cliente', clienteId] });
+      }
+      await queryClient.invalidateQueries({ queryKey: ['clientes'] });
+      setEditando(false);
+    },
+  });
+
 
   return (
     <main>
@@ -31,15 +53,37 @@ export function ClienteDetallePage() {
           {isPending && <p>Cargando cliente...</p>}
           {isError && <p>No se pudo cargar el cliente. Intentá nuevamente.</p>}
           {isSuccess && data === null && <p>Cliente no encontrado.</p>}
-          {isSuccess && data !== null && (
-            <dl>
-              {Object.entries(data).map(([campo, valor]) => (
-                <div key={campo}>
-                  <dt>{campo}</dt>
-                  <dd>{formatearValor(valor)}</dd>
-                </div>
-              ))}
-            </dl>
+
+          {isSuccess && data && !editando && (
+            <>
+              <dl>
+                {Object.entries(data).map(([campo, valor]) => (
+                  <div key={campo}>
+                    <dt>{campo}</dt>
+                    <dd>{formatearValor(valor)}</dd>
+                  </div>
+                ))}
+              </dl>
+              <button type="button" onClick={() => setEditando(true)}>
+                Editar
+              </button>
+            </>
+          )}
+
+          {/* Se renderiza según "data" (no según isSuccess) para que el
+              formulario no se desmonte ni pierda lo escrito ante un refetch. */}
+          {data && editando && (
+            <ClienteForm
+              defaultValues={{
+                nombre: data.nombre,
+                email: data.email,
+                telefono: data.telefono,
+              }}
+              onSubmit={(datos) => {actualizar.mutate(datos);}}
+              onCancel={() => setEditando(false)}
+              isSaving={actualizar.isPending}
+              submitError={actualizar.isError ? actualizar.error.message : null}
+            />
           )}
         </>
       )}
