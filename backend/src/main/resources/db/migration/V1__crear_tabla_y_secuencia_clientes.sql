@@ -1,0 +1,19 @@
+-- V1__crear_tabla_y_secuencia_clientes.sql
+-- Creación de secuencia y tabla CLIENTES para migración a Oracle
+
+CREATE SEQUENCE CLIENTES_SEQ
+    START WITH 6
+    INCREMENT BY 1
+    NOCACHE
+    NOCYCLE;
+
+CREATE TABLE CLIENTES (
+    ID          NUMBER(19)      NOT NULL,
+    NOMBRE      VARCHAR2(100)   NOT NULL,
+    ESTADO      VARCHAR2(20)    NOT NULL,
+    EMAIL       VARCHAR2(100)   NOT NULL,
+    TELEFONO    VARCHAR2(30)    NOT NULL,
+    FECHA_ALTA  DATE            NOT NULL,
+    CONSTRAINT PK_CLIENTES PRIMARY KEY (ID),
+    CONSTRAINT CK_CLIENTES_ESTADO CHECK (ESTADO IN ('ACTIVO', 'INACTIVO'))
+);
