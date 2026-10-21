@@ -1,55 +1,86 @@
 package ar.capacitacion.clientes.controller;
 
-import ar.capacitacion.clientes.dto.*;
+import ar.capacitacion.clientes.dto.ClienteDTO;
+import ar.capacitacion.clientes.dto.ClienteDetalleDTO;
+import ar.capacitacion.clientes.dto.ClienteRequestDTO;
+import ar.capacitacion.clientes.entity.EstadoCliente;
 import ar.capacitacion.clientes.service.ClienteService;
-import ar.capacitacion.clientes.repository.ClienteRepository;
+import ar.capacitacion.clientes.controller.CorsConfig;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.context.annotation.Import;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
-@AutoConfigureMockMvc
+/**
+ * Pruebas del contrato HTTP del Controller (rutas, códigos de estado, validaciones y JSON).
+ *
+ * Usa un slice web (@WebMvcTest): no levanta base de datos, Flyway ni JPA, y el Service
+ * está simulado con Mockito. Las reglas de negocio y la persistencia NO se verifican aquí.
+ */
+@WebMvcTest(ClienteController.class)
+@Import(CorsConfig.class)
 class ClienteControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
 
-    @Autowired
-    private ClienteRepository repository;
+    // Spring Boot 3.3.x (Spring Framework 6.1) usa @MockBean; @MockitoBean llega con Framework 6.2.
+    @MockBean
+    private ClienteService service;
 
-    @BeforeEach
-    void setUp() {
-        // Garantiza aislamiento total entre pruebas restableciendo el repositorio en memoria
-        repository.reset();
+    private static ClienteDetalleDTO ana() {
+        return new ClienteDetalleDTO(1, "Ana", EstadoCliente.ACTIVO,
+                "ana@example.com", "11-4000-1001", LocalDate.of(2022, 3, 15));
+    }
+
+    private static ClienteDetalleDTO elena() {
+        return new ClienteDetalleDTO(5, "Elena", EstadoCliente.INACTIVO,
+                "elena@example.com", "11-4000-1005", LocalDate.of(2024, 5, 30));
     }
 
     // -------------------------------------------------------------------------
-    // Tests existentes (compatibilidad Clases 3 a 5)
+    // Consulta (GET /api/clientes y GET /api/clientes/{id})
     // -------------------------------------------------------------------------
 
     @Test
     void listarClientes_deberiaRetornar5Elementos() throws Exception {
+        when(service.listar()).thenReturn(List.of(
+                new ClienteDTO(1, "Ana", EstadoCliente.ACTIVO),
+                new ClienteDTO(2, "Bruno", EstadoCliente.INACTIVO),
+                new ClienteDTO(3, "Carla", EstadoCliente.ACTIVO),
+                new ClienteDTO(4, "Diego", EstadoCliente.ACTIVO),
+                new ClienteDTO(5, "Elena", EstadoCliente.INACTIVO)));
+
         mockMvc.perform(get("/api/clientes").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$", hasSize(5)))
                 .andExpect(jsonPath("$[0].id", is(1)))
                 .andExpect(jsonPath("$[0].nombre", is("Ana")))
@@ -64,6 +95,9 @@ class ClienteControllerTest {
         mockMvc.perform(get("/api/clientes").param("scenario", "empty").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(0)));
+
+        // El escenario didáctico se resuelve en el Controller, sin consultar al Service
+        verifyNoInteractions(service);
     }
 
     @Test
@@ -71,12 +105,17 @@ class ClienteControllerTest {
         mockMvc.perform(get("/api/clientes").param("scenario", "error").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.mensaje", is("Servicio no disponible (escenario didáctico)")));
+
+        verifyNoInteractions(service);
     }
 
     @Test
     void obtenerPorId_existente1_deberiaRetornar200YContenido() throws Exception {
+        when(service.buscarPorId(1L)).thenReturn(Optional.of(ana()));
+
         mockMvc.perform(get("/api/clientes/1").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.id", is(1)))
                 .andExpect(jsonPath("$.nombre", is("Ana")))
                 .andExpect(jsonPath("$.estado", is("ACTIVO")))
@@ -87,6 +126,8 @@ class ClienteControllerTest {
 
     @Test
     void obtenerPorId_existente5_deberiaRetornar200() throws Exception {
+        when(service.buscarPorId(5L)).thenReturn(Optional.of(elena()));
+
         mockMvc.perform(get("/api/clientes/5").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is(5)))
@@ -99,6 +140,8 @@ class ClienteControllerTest {
 
     @Test
     void obtenerPorId_inexistente999_deberiaRetornar404() throws Exception {
+        when(service.buscarPorId(999L)).thenReturn(Optional.empty());
+
         mockMvc.perform(get("/api/clientes/999").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.mensaje", is("Cliente no encontrado")));
@@ -108,10 +151,12 @@ class ClienteControllerTest {
     void obtenerPorId_escenarioError_deberiaRetornar503() throws Exception {
         mockMvc.perform(get("/api/clientes/1").param("scenario", "error").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isServiceUnavailable());
+
+        verifyNoInteractions(service);
     }
 
     // -------------------------------------------------------------------------
-    // Tests de Alta (POST /api/clientes)
+    // Alta (POST /api/clientes)
     // -------------------------------------------------------------------------
 
     @Test
@@ -123,6 +168,9 @@ class ClienteControllerTest {
                     "telefono": "11-4000-1006"
                 }
                 """;
+        when(service.crear(any(ClienteRequestDTO.class))).thenReturn(new ClienteDetalleDTO(
+                6, "Franco", EstadoCliente.ACTIVO, "franco@example.com", "11-4000-1006",
+                LocalDate.of(2025, 1, 15)));
 
         mockMvc.perform(post("/api/clientes")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -134,22 +182,10 @@ class ClienteControllerTest {
                 .andExpect(jsonPath("$.estado", is("ACTIVO")))
                 .andExpect(jsonPath("$.email", is("franco@example.com")))
                 .andExpect(jsonPath("$.telefono", is("11-4000-1006")))
-                .andExpect(jsonPath("$.fechaAlta", is(LocalDate.now().toString())));
+                .andExpect(jsonPath("$.fechaAlta", is("2025-01-15")));
 
-        // Verificar que el cliente recién creado es consultable por su ID
-        mockMvc.perform(get("/api/clientes/6").accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(6)))
-                .andExpect(jsonPath("$.nombre", is("Franco")))
-                .andExpect(jsonPath("$.estado", is("ACTIVO")));
-
-        // Verificar que aparece en el listado general
-        mockMvc.perform(get("/api/clientes").accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(6)))
-                .andExpect(jsonPath("$[5].id", is(6)))
-                .andExpect(jsonPath("$[5].nombre", is("Franco")))
-                .andExpect(jsonPath("$[5].estado", is("ACTIVO")));
+        // El JSON recibido se convirtió correctamente al DTO de entrada que usa el Service
+        verify(service).crear(new ClienteRequestDTO("Franco", "franco@example.com", "11-4000-1006"));
     }
 
     @Test
@@ -171,10 +207,25 @@ class ClienteControllerTest {
                 .andExpect(jsonPath("$.errores.nombre").exists())
                 .andExpect(jsonPath("$.errores.email").exists())
                 .andExpect(jsonPath("$.errores.telefono").exists());
+
+        // Una solicitud inválida nunca debe llegar al Service
+        verify(service, never()).crear(any());
+    }
+
+    @Test
+    void crearCliente_cuerpoMalformado_deberiaRetornar400() throws Exception {
+        mockMvc.perform(post("/api/clientes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{ esto no es json")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensaje", is("Cuerpo de solicitud inválido o ausente")));
+
+        verifyNoInteractions(service);
     }
 
     // -------------------------------------------------------------------------
-    // Tests de Modificación (PUT /api/clientes/{id})
+    // Modificación (PUT /api/clientes/{id})
     // -------------------------------------------------------------------------
 
     @Test
@@ -186,6 +237,9 @@ class ClienteControllerTest {
                     "telefono": "11-4000-9999"
                 }
                 """;
+        when(service.actualizar(eq(1L), any(ClienteRequestDTO.class))).thenReturn(Optional.of(
+                new ClienteDetalleDTO(1, "Ana María", EstadoCliente.ACTIVO,
+                        "anamaria@example.com", "11-4000-9999", LocalDate.of(2022, 3, 15))));
 
         mockMvc.perform(put("/api/clientes/1")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -199,16 +253,9 @@ class ClienteControllerTest {
                 .andExpect(jsonPath("$.telefono", is("11-4000-9999")))
                 .andExpect(jsonPath("$.fechaAlta", is("2022-03-15")));
 
-        // Reflejo en consulta por ID
-        mockMvc.perform(get("/api/clientes/1").accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.nombre", is("Ana María")))
-                .andExpect(jsonPath("$.email", is("anamaria@example.com")));
-
-        // Reflejo en listado general
-        mockMvc.perform(get("/api/clientes").accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].nombre", is("Ana María")));
+        // El id de la URL y el cuerpo JSON llegan correctamente al Service
+        verify(service).actualizar(1L,
+                new ClienteRequestDTO("Ana María", "anamaria@example.com", "11-4000-9999"));
     }
 
     @Test
@@ -220,6 +267,7 @@ class ClienteControllerTest {
                     "telefono": "11-4000-9999"
                 }
                 """;
+        when(service.actualizar(eq(999L), any(ClienteRequestDTO.class))).thenReturn(Optional.empty());
 
         mockMvc.perform(put("/api/clientes/999")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -248,11 +296,17 @@ class ClienteControllerTest {
                 .andExpect(jsonPath("$.errores.nombre").exists())
                 .andExpect(jsonPath("$.errores.email").exists())
                 .andExpect(jsonPath("$.errores.telefono").exists());
+
+        verifyNoInteractions(service);
     }
 
+    /**
+     * Versión a nivel Controller: verifica que la respuesta expone tal cual el id, el estado
+     * y la fechaAlta que devuelve el Service. Que el Service los conserve realmente al
+     * actualizar es una regla de negocio y se prueba en un test unitario del Service.
+     */
     @Test
     void actualizarCliente_deberiaConservarIdFechaAltaYEstado() throws Exception {
-        // Bruno: id=2, estado=INACTIVO, fechaAlta=2021-07-22
         String payload = """
                 {
                     "nombre": "Bruno Actualizado",
@@ -260,6 +314,9 @@ class ClienteControllerTest {
                     "telefono": "11-4000-8888"
                 }
                 """;
+        when(service.actualizar(eq(2L), any(ClienteRequestDTO.class))).thenReturn(Optional.of(
+                new ClienteDetalleDTO(2, "Bruno Actualizado", EstadoCliente.INACTIVO,
+                        "bruno.nuevo@example.com", "11-4000-8888", LocalDate.of(2021, 7, 22))));
 
         mockMvc.perform(put("/api/clientes/2")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -275,61 +332,33 @@ class ClienteControllerTest {
     }
 
     // -------------------------------------------------------------------------
-    // Tests de Baja Lógica (DELETE /api/clientes/{id})
+    // Baja lógica (DELETE /api/clientes/{id})
     // -------------------------------------------------------------------------
 
     @Test
     void darDeBaja_existente_deberiaRetornar204YModificarEstadoAInactivo() throws Exception {
-        // Ana inicialmente ACTIVO
-        mockMvc.perform(delete("/api/clientes/1"))
-                .andExpect(status().isNoContent());
+        when(service.darDeBaja(1L)).thenReturn(true);
 
-        // Consultar detalle: ahora debe estar INACTIVO conservando todos sus demás datos
-        mockMvc.perform(get("/api/clientes/1").accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(1)))
-                .andExpect(jsonPath("$.nombre", is("Ana")))
-                .andExpect(jsonPath("$.estado", is("INACTIVO")))
-                .andExpect(jsonPath("$.email", is("ana@example.com")))
-                .andExpect(jsonPath("$.telefono", is("11-4000-1001")))
-                .andExpect(jsonPath("$.fechaAlta", is("2022-03-15")));
+        mockMvc.perform(delete("/api/clientes/1"))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+
+        // A nivel Controller solo se verifica la delegación al Service; el cambio de estado
+        // a INACTIVO es una regla del Service.
+        verify(service).darDeBaja(1L);
     }
 
     @Test
     void darDeBaja_inexistente_deberiaRetornar404() throws Exception {
+        when(service.darDeBaja(999L)).thenReturn(false);
+
         mockMvc.perform(delete("/api/clientes/999"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.mensaje", is("Cliente no encontrado")));
     }
 
-    @Test
-    void darDeBaja_clienteInactivoDebeConservarseEnListado() throws Exception {
-        mockMvc.perform(delete("/api/clientes/1"))
-                .andExpect(status().isNoContent());
-
-        // El listado debe conservar sus 5 elementos y reflejar el estado INACTIVO
-        mockMvc.perform(get("/api/clientes").accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(5)))
-                .andExpect(jsonPath("$[0].id", is(1)))
-                .andExpect(jsonPath("$[0].nombre", is("Ana")))
-                .andExpect(jsonPath("$[0].estado", is("INACTIVO")));
-    }
-
-    @Test
-    void darDeBaja_clienteYaInactivo_deberiaSerIdempotenteYRetornar204() throws Exception {
-        // Bruno (id=2) ya es INACTIVO
-        mockMvc.perform(delete("/api/clientes/2"))
-                .andExpect(status().isNoContent());
-
-        mockMvc.perform(get("/api/clientes/2").accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(2)))
-                .andExpect(jsonPath("$.estado", is("INACTIVO")));
-    }
-
     // -------------------------------------------------------------------------
-    // Test de CORS
+    // CORS
     // -------------------------------------------------------------------------
 
     @Test
@@ -343,4 +372,14 @@ class ClienteControllerTest {
                 .andExpect(header().string("Access-Control-Allow-Methods", containsString("PUT")))
                 .andExpect(header().string("Access-Control-Allow-Methods", containsString("DELETE")));
     }
+
+    // -------------------------------------------------------------------------
+    // Escenarios originales que no se pueden verificar con un Service simulado
+    // (requieren estado real o lógica del Service):
+    //  - crearCliente: estado inicial ACTIVO, fecha de alta actual y trim de los datos.
+    //  - crearCliente / actualizarCliente: reflejo posterior en consulta por ID y en el listado.
+    //  - darDeBaja_clienteInactivoDebeConservarseEnListado.
+    //  - darDeBaja_clienteYaInactivo_deberiaSerIdempotenteYRetornar204.
+    //  - listar: orden ascendente por ID.
+    // -------------------------------------------------------------------------
 }
