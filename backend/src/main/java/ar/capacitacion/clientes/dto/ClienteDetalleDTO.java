@@ -1,4 +1,6 @@
-package ar.capacitacion.clientes;
+package ar.capacitacion.clientes.dto;
+
+import ar.capacitacion.clientes.entity.EstadoCliente;
 
 import java.time.LocalDate;
 

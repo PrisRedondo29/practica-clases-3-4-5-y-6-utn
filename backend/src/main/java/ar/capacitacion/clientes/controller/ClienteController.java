@@ -1,4 +1,7 @@
-package ar.capacitacion.clientes;
+package ar.capacitacion.clientes.controller;
+
+import ar.capacitacion.clientes.dto.*;
+import ar.capacitacion.clientes.service.ClienteService;
 
 import java.util.LinkedHashMap;
 import java.util.List;

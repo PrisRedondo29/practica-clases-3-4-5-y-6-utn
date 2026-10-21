@@ -1,4 +1,4 @@
-package ar.capacitacion.clientes;
+package ar.capacitacion.clientes.entity;
 
 public enum EstadoCliente {
     ACTIVO, INACTIVO
