@@ -1,4 +1,4 @@
-package ar.capacitacion.clientes;
+package ar.capacitacion.clientes.controller;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

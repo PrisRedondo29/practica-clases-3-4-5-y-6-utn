@@ -1,4 +1,8 @@
-package ar.capacitacion.clientes;
+package ar.capacitacion.clientes.service;
+
+import ar.capacitacion.clientes.dto.*;
+import ar.capacitacion.clientes.entity.EstadoCliente;
+import ar.capacitacion.clientes.repository.ClienteRepository;
 
 import java.time.LocalDate;
 import java.util.List;
