@@ -60,16 +60,10 @@ public class AprobarSolicitudServlet extends HttpServlet {
                     solicitud.getTelefono()
             );
 
-            // 4. Punto de interrupción / verificación de fallo técnico
-            if (simularFallo) {
-                throw new IllegalStateException(
-                        "Fallo técnico simulado posterior a la creación del cliente (demostración didáctica)");
-            }
-
-            // 5. Actualización de estado y vinculación de la solicitud
+            // 4. Actualización de estado y vinculación de la solicitud
             solicitudDAO.actualizarAprobada(id, nuevoClienteId, new Date(System.currentTimeMillis()));
 
-            // 6. Respuesta al cliente HTTP
+            // 5. Respuesta al cliente HTTP
             response.setStatus(HttpServletResponse.SC_OK);
             response.setContentType("application/json;charset=UTF-8");
             response.getWriter().write("{\"mensaje\":\"Solicitud aprobada con éxito\",\"clienteId\":" + nuevoClienteId + "}");

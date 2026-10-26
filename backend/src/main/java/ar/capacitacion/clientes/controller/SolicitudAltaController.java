@@ -1,16 +1,9 @@
 package ar.capacitacion.clientes.controller;
 
-import ar.capacitacion.clientes.dto.ClienteDetalleDTO;
-import ar.capacitacion.clientes.dto.ClienteRequestDTO;
 import ar.capacitacion.clientes.dto.SolicitudAltaDTO;
 import ar.capacitacion.clientes.dto.SolicitudAltaRequestDTO;
-import ar.capacitacion.clientes.entity.EstadoSolicitud;
-import ar.capacitacion.clientes.entity.SolicitudAltaEntity;
-import ar.capacitacion.clientes.repository.SolicitudAltaRepository;
-import ar.capacitacion.clientes.service.ClienteService;
 import ar.capacitacion.clientes.service.SolicitudAltaService;
 
-import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,29 +26,17 @@ import jakarta.validation.Valid;
 /**
  * Controlador REST para el circuito de solicitudes de alta de clientes.
  *
- * NOTA DIDÁCTICA CENTRAL (CLASE 8):
- * El método {@code aprobar} implementa DELIBERADAMENTE un antipatrón arquitectónico:
- * coordina la lógica de negocio directamente en el Controller, ejecutando dos escrituras
- * independientes sin un límite transaccional unificado.
- *
- * Durante la práctica en vivo de la Clase 8, la docente mostrará el fallo y refactorizará
- * este método trasladando la coordinación hacia {@link SolicitudAltaService} con {@code @Transactional}.
+ * Expone los endpoints para listar, consultar, registrar, rechazar y aprobar
+ * solicitudes de alta, delegando la lógica de negocio en {@link SolicitudAltaService}.
  */
 @RestController
 @RequestMapping("/api/solicitudes")
 public class SolicitudAltaController {
 
     private final SolicitudAltaService solicitudService;
-    private final SolicitudAltaRepository solicitudRepository;
-    private final ClienteService clienteService;
 
-    public SolicitudAltaController(
-            SolicitudAltaService solicitudService,
-            SolicitudAltaRepository solicitudRepository,
-            ClienteService clienteService) {
+    public SolicitudAltaController(SolicitudAltaService solicitudService) {
         this.solicitudService = solicitudService;
-        this.solicitudRepository = solicitudRepository;
-        this.clienteService = clienteService;
     }
 
     /**
@@ -104,56 +85,23 @@ public class SolicitudAltaController {
 
     /**
      * POST /api/solicitudes/{id}/aprobar?simularFallo=true|false
-     *
-     * ANTIPATRÓN INICIAL DELIBERADO:
-     * Este método NO TIENE @Transactional.
-     * Coordina dos escrituras independientes:
-     * 1) Llama a clienteService.crear(), que abre SU PROPIA transacción y hace COMMIT inmediato.
-     * 2) Si simularFallo=true, se produce una excepción unchecked.
-     *    El cliente ya quedó insertado y confirmado en la base de datos, pero la solicitud
-     *    nunca se actualiza a APROBADA (queda PENDIENTE), dejando la base en estado INCONSISTENTE.
      */
     @PostMapping("/{id}/aprobar")
     public ResponseEntity<?> aprobar(
             @PathVariable long id,
             @RequestParam(defaultValue = "false") boolean simularFallo) {
-
-        // 1. Recuperar la solicitud
-        SolicitudAltaEntity solicitud = solicitudRepository.findById(id).orElse(null);
-        if (solicitud == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("mensaje", "Solicitud no encontrada"));
-        }
-
-        // 2. Validar que la solicitud esté PENDIENTE
-        if (solicitud.getEstado() != EstadoSolicitud.PENDIENTE) {
+        try {
+            return solicitudService.aprobar(id, simularFallo)
+                    .<ResponseEntity<?>>map(ResponseEntity::ok)
+                    .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                            .body(Map.of("mensaje", "Solicitud no encontrada")));
+        } catch (IllegalStateException ex) {
+            if (ex.getMessage() != null && ex.getMessage().contains("Fallo técnico simulado")) {
+                throw ex;
+            }
             return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("mensaje", "La solicitud " + id + " ya fue resuelta (estado actual: " + solicitud.getEstado() + ")"));
+                    .body(Map.of("mensaje", ex.getMessage()));
         }
-
-        // 3. PRIMERA ESCRITURA: Llamada a ClienteService.crear(...)
-        // Al ejecutarse sin transacción envolvente en el Controller, ClienteService.crear()
-        // inicia su propia transacción física (Propagation.REQUIRED), ejecuta el INSERT
-        // y hace COMMIT inmediato al retornar.
-        ClienteDetalleDTO clienteCreado = clienteService.crear(new ClienteRequestDTO(
-                solicitud.getNombre(),
-                solicitud.getEmail(),
-                solicitud.getTelefono()));
-
-        // 4. FALLA TÉCNICA CONTROLADA (Mecanismo didáctico para la Clase 8)
-        // Ocurre DESPUÉS de que el cliente fue creado y confirmado en la BD.
-        if (simularFallo) {
-            throw new IllegalStateException(
-                    "Fallo técnico simulado posterior a la creación del cliente (demostración didáctica Clase 8)");
-        }
-
-        // 5. SEGUNDA ESCRITURA: Actualizar la solicitud a APROBADA
-        solicitud.setEstado(EstadoSolicitud.APROBADA);
-        solicitud.setFechaResolucion(LocalDate.now());
-        solicitud.setClienteId(clienteCreado.id());
-        SolicitudAltaEntity guardada = solicitudRepository.save(solicitud);
-
-        return ResponseEntity.ok(solicitudService.aDTO(guardada));
     }
 
     /**

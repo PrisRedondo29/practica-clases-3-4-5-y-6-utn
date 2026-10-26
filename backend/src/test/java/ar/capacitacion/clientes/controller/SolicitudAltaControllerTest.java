@@ -1,14 +1,8 @@
 package ar.capacitacion.clientes.controller;
 
-import ar.capacitacion.clientes.dto.ClienteDetalleDTO;
-import ar.capacitacion.clientes.dto.ClienteRequestDTO;
 import ar.capacitacion.clientes.dto.SolicitudAltaDTO;
 import ar.capacitacion.clientes.dto.SolicitudAltaRequestDTO;
-import ar.capacitacion.clientes.entity.EstadoCliente;
 import ar.capacitacion.clientes.entity.EstadoSolicitud;
-import ar.capacitacion.clientes.entity.SolicitudAltaEntity;
-import ar.capacitacion.clientes.repository.SolicitudAltaRepository;
-import ar.capacitacion.clientes.service.ClienteService;
 import ar.capacitacion.clientes.service.SolicitudAltaService;
 
 import java.time.LocalDate;
@@ -37,9 +31,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Pruebas del contrato HTTP de SolicitudAltaController y verificación del antipatrón inicial.
+ * Pruebas del contrato HTTP de SolicitudAltaController.
  *
- * Utiliza slice web (@WebMvcTest): simula los servicios y repositorios sin levantar Oracle.
+ * Utiliza slice web (@WebMvcTest): simula el servicio sin levantar la base de datos.
  */
 @WebMvcTest(SolicitudAltaController.class)
 @Import(CorsConfig.class)
@@ -50,12 +44,6 @@ class SolicitudAltaControllerTest {
 
     @MockBean
     private SolicitudAltaService solicitudService;
-
-    @MockBean
-    private SolicitudAltaRepository solicitudRepository;
-
-    @MockBean
-    private ClienteService clienteService;
 
     // -------------------------------------------------------------------------
     // Consulta y listado
@@ -163,71 +151,46 @@ class SolicitudAltaControllerTest {
     }
 
     // -------------------------------------------------------------------------
-    // Antipatrón inicial de aprobación (POST /api/solicitudes/{id}/aprobar)
+    // Aprobación (POST /api/solicitudes/{id}/aprobar)
     // -------------------------------------------------------------------------
 
     @Test
     void aprobar_exitoso_deberiaCrearClienteYActualizarSolicitud() throws Exception {
-        SolicitudAltaEntity entidad = new SolicitudAltaEntity(
-                "Lucía Ramos", "lucia.ramos@example.com", "11-4000-2003", LocalDate.of(2025, 2, 3));
-        when(solicitudRepository.findById(3L)).thenReturn(Optional.of(entidad));
-
-        when(clienteService.crear(any(ClienteRequestDTO.class))).thenReturn(
-                new ClienteDetalleDTO(10L, "Lucía Ramos", EstadoCliente.ACTIVO,
-                        "lucia.ramos@example.com", "11-4000-2003", LocalDate.now()));
-
-        when(solicitudRepository.save(any(SolicitudAltaEntity.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        when(solicitudService.aDTO(any(SolicitudAltaEntity.class))).thenReturn(
+        when(solicitudService.aprobar(eq(3L), eq(false))).thenReturn(Optional.of(
                 new SolicitudAltaDTO(3, "Lucía Ramos", "lucia.ramos@example.com", "11-4000-2003",
-                        EstadoSolicitud.APROBADA, LocalDate.of(2025, 2, 3), LocalDate.now(), 10L));
+                        EstadoSolicitud.APROBADA, LocalDate.of(2025, 2, 3), LocalDate.now(), 10L)));
 
         mockMvc.perform(post("/api/solicitudes/3/aprobar").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.estado", is("APROBADA")))
                 .andExpect(jsonPath("$.clienteId", is(10)));
 
-        verify(clienteService).crear(new ClienteRequestDTO("Lucía Ramos", "lucia.ramos@example.com", "11-4000-2003"));
-        verify(solicitudRepository).save(any(SolicitudAltaEntity.class));
+        verify(solicitudService).aprobar(3L, false);
     }
 
     @Test
     void aprobar_conFalloSimulado_deberiaCrearClientePeroFallarAntesDeActualizarSolicitud() throws Exception {
-        SolicitudAltaEntity entidad = new SolicitudAltaEntity(
-                "Marcos Paz", "marcos.paz@example.com", "11-4000-2001", LocalDate.of(2025, 2, 1));
-        when(solicitudRepository.findById(1L)).thenReturn(Optional.of(entidad));
+        when(solicitudService.aprobar(eq(1L), eq(true))).thenThrow(new IllegalStateException(
+                "Fallo técnico simulado posterior a la creación del cliente (demostración didáctica Clase 8)"));
 
-        when(clienteService.crear(any(ClienteRequestDTO.class))).thenReturn(
-                new ClienteDetalleDTO(8L, "Marcos Paz", EstadoCliente.ACTIVO,
-                        "marcos.paz@example.com", "11-4000-2001", LocalDate.now()));
-
-        // Al ejecutar con simularFallo=true, el Controller llama a clienteService.crear(...)
-        // y luego lanza IllegalStateException. Debe retornar 500 y NUNCA llamar a solicitudRepository.save()!
         mockMvc.perform(post("/api/solicitudes/1/aprobar")
                         .param("simularFallo", "true")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.mensaje", is("Fallo técnico simulado posterior a la creación del cliente (demostración didáctica Clase 8)")));
 
-        // Evidencia clave del antipatrón: la creación del cliente SE EJECUTÓ
-        verify(clienteService).crear(new ClienteRequestDTO("Marcos Paz", "marcos.paz@example.com", "11-4000-2001"));
-
-        // Pero la actualización de la solicitud NUNCA se guardó
-        verify(solicitudRepository, never()).save(any());
+        verify(solicitudService).aprobar(1L, true);
     }
 
     @Test
     void aprobar_solicitudYaAprobada_deberiaRetornar409Conflict() throws Exception {
-        SolicitudAltaEntity entidad = new SolicitudAltaEntity(
-                "Marcos Paz", "marcos.paz@example.com", "11-4000-2001", LocalDate.of(2025, 2, 1));
-        entidad.setEstado(EstadoSolicitud.APROBADA);
-        when(solicitudRepository.findById(1L)).thenReturn(Optional.of(entidad));
+        when(solicitudService.aprobar(eq(1L), eq(false))).thenThrow(new IllegalStateException(
+                "La solicitud 1 ya fue resuelta (estado actual: APROBADA)"));
 
         mockMvc.perform(post("/api/solicitudes/1/aprobar").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.mensaje", is("La solicitud 1 ya fue resuelta (estado actual: APROBADA)")));
 
-        // No debe crear cliente si no estaba PENDIENTE
-        verify(clienteService, never()).crear(any());
+        verify(solicitudService).aprobar(1L, false);
     }
 }

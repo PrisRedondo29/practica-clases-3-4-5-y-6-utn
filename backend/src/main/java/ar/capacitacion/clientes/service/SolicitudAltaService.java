@@ -1,5 +1,7 @@
 package ar.capacitacion.clientes.service;
 
+import ar.capacitacion.clientes.dto.ClienteDetalleDTO;
+import ar.capacitacion.clientes.dto.ClienteRequestDTO;
 import ar.capacitacion.clientes.dto.SolicitudAltaDTO;
 import ar.capacitacion.clientes.dto.SolicitudAltaRequestDTO;
 import ar.capacitacion.clientes.entity.EstadoSolicitud;
@@ -14,30 +16,27 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Servicio para gestión básica de solicitudes de alta de clientes (registro, consulta y rechazo).
- *
- * NOTA DIDÁCTICA CLASE 8:
- * En este estado inicial, la operación compleja de APROBACIÓN no está implementada aquí;
- * se encuentra deliberadamente ubicada en el SolicitudAltaController para demostrar el antipatrón
- * de coordinación fuera del límite transaccional. Durante la clase en vivo, la docente migrará
- * dicha lógica hacia este Service aplicando @Transactional.
+ * Servicio para la gestión de solicitudes de alta de clientes (registro, consulta, rechazo y aprobación).
  */
 @Service
-@Transactional(readOnly = true)
 public class SolicitudAltaService {
 
     private final SolicitudAltaRepository repository;
+    private final ClienteService clienteService;
 
-    public SolicitudAltaService(SolicitudAltaRepository repository) {
+    public SolicitudAltaService(SolicitudAltaRepository repository, ClienteService clienteService) {
         this.repository = repository;
+        this.clienteService = clienteService;
     }
 
+    @Transactional(readOnly = true)
     public List<SolicitudAltaDTO> listar() {
         return repository.findAllByOrderByIdAsc().stream()
                 .map(this::aDTO)
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public Optional<SolicitudAltaDTO> buscarPorId(long id) {
         return repository.findById(id).map(this::aDTO);
     }
@@ -75,6 +74,16 @@ public class SolicitudAltaService {
         return Optional.of(aDTO(solicitud));
     }
 
+    /**
+     * Aprobación de una solicitud de alta.
+     */
+    public Optional<SolicitudAltaDTO> aprobar(
+            long id, boolean simularFallo) {
+
+        throw new UnsupportedOperationException(
+                "La aprobación todavía no fue migrada");
+    }
+    
     public SolicitudAltaDTO aDTO(SolicitudAltaEntity entity) {
         return new SolicitudAltaDTO(
                 entity.getId(),
