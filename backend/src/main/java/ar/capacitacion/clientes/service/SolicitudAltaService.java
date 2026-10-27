@@ -76,14 +76,39 @@ public class SolicitudAltaService {
 
     /**
      * Aprobación de una solicitud de alta.
+     * Crea el cliente a partir de los datos de la solicitud y, si no ocurre ninguna falla,
+     * marca la solicitud como APROBADA vinculándola al cliente creado.
      */
-    public Optional<SolicitudAltaDTO> aprobar(
-            long id, boolean simularFallo) {
+    @Transactional
+    public Optional<SolicitudAltaDTO> aprobar(long id, boolean simularFallo) {
+        Optional<SolicitudAltaEntity> opt = repository.findById(id);
+        if (opt.isEmpty()) {
+            return Optional.empty();
+        }
 
-        throw new UnsupportedOperationException(
-                "La aprobación todavía no fue migrada");
+        SolicitudAltaEntity solicitud = opt.get();
+        if (solicitud.getEstado() != EstadoSolicitud.PENDIENTE) {
+            throw new IllegalStateException(
+                    "La solicitud " + id + " ya fue resuelta (estado actual: " + solicitud.getEstado() + ")");
+        }
+
+        ClienteDetalleDTO cliente = clienteService.crear(new ClienteRequestDTO(
+                solicitud.getNombre(),
+                solicitud.getEmail(),
+                solicitud.getTelefono()));
+
+        if (simularFallo) {
+            throw new IllegalStateException(
+                    "Fallo técnico simulado posterior a la creación del cliente (demostración didáctica Clase 8)");
+        }
+
+        solicitud.setEstado(EstadoSolicitud.APROBADA);
+        solicitud.setFechaResolucion(LocalDate.now());
+        solicitud.setClienteId(cliente.id());
+
+        return Optional.of(aDTO(repository.save(solicitud)));
     }
-    
+        
     public SolicitudAltaDTO aDTO(SolicitudAltaEntity entity) {
         return new SolicitudAltaDTO(
                 entity.getId(),
