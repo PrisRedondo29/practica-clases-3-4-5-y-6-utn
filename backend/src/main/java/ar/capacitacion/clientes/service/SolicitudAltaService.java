@@ -88,8 +88,7 @@ public class SolicitudAltaService {
 
         SolicitudAltaEntity solicitud = opt.get();
         if (solicitud.getEstado() != EstadoSolicitud.PENDIENTE) {
-            throw new IllegalStateException(
-                    "La solicitud " + id + " ya fue resuelta (estado actual: " + solicitud.getEstado() + ")");
+            throw new SolicitudYaResueltaException(id, solicitud.getEstado());
         }
 
         ClienteDetalleDTO cliente = clienteService.crear(new ClienteRequestDTO(

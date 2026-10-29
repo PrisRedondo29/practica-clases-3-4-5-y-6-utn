@@ -3,6 +3,7 @@ package ar.capacitacion.clientes.controller;
 import ar.capacitacion.clientes.dto.SolicitudAltaDTO;
 import ar.capacitacion.clientes.dto.SolicitudAltaRequestDTO;
 import ar.capacitacion.clientes.service.SolicitudAltaService;
+import ar.capacitacion.clientes.service.SolicitudYaResueltaException;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -11,6 +12,7 @@ import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -137,5 +139,15 @@ public class SolicitudAltaController {
     public ResponseEntity<Map<String, Object>> handleReadableException(HttpMessageNotReadableException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("mensaje", "Cuerpo de solicitud inválido o ausente"));
+    }
+
+    /**
+     * Solicitud ya resuelta (409 Conflict) en formato ProblemDetail.
+     */
+    @ExceptionHandler(SolicitudYaResueltaException.class)
+    public ProblemDetail handleSolicitudYaResuelta(SolicitudYaResueltaException ex) {
+        ProblemDetail problema = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problema.setTitle("Solicitud ya resuelta");
+        return problema;
     }
 }
